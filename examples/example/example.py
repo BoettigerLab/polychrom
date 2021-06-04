@@ -14,8 +14,9 @@ import os
 from polychrom.hdf5_format import HDF5Reporter
 
 N=10000
-
-reporter = HDF5Reporter(folder="trajectory", max_data_length=5, overwrite=True)
+folder = r'T:\2020-06-21_PolychromSims\trajectory' # "trajectory"
+print(folder)
+reporter = HDF5Reporter(folder=folder, max_data_length=5, overwrite=True)
 sim = simulation.Simulation(
     platform="CUDA", 
     integrator="variableLangevin",

@@ -27,7 +27,7 @@ data = polymerutils.grow_rw(N, int(box) - 2)  # creates a compact conformation
 block = 0  # starting block
 
 # folder
-folder = "trajectory"
+folder = r'T:\2020-06-21_PolychromSims\trajectory'#  "trajectory"
 
 # new parameters because some things changed
 saveEveryBlocks = 10  # save every 10 blocks (saving every block is now too much almost)

@@ -254,8 +254,11 @@ def do_coloring(
     bgcolor = "grey"
     letters = [i for i in "1234567890abcdefghijklmnopqrstuvwxyz"]
     names = [i + j + k for i in letters for j in letters for k in letters]
-
-    out = tempfile.NamedTemporaryFile(mode="w")
+    
+    scratchFile = r'C:\Users\Alistair\Documents\Scratch\temp'
+    out = tempfile.NamedTemporaryFile(mode="w+b",delete=False)
+    # # NOTE: tempfile.NamedTemporaryFile(mode='w') Already *creates* and *opens* the file.  On Windows, you can't open a file that is already open.  According to the tempfile documentation, you shouldn't do this: https://stackoverflow.com/questions/23212435/permission-denied-to-write-to-my-temporary-file
+    # out = os.path.join(tempfile.gettempdir(), os.urandom(24).hex())
 
     if returnScriptName is not None:
         pdbname = returnScriptName
@@ -328,8 +331,9 @@ def do_coloring(
         return "".join(open(out.name).readlines())
 
     # out.write("alter all, vdw={0} \n".format(sphereRadius))
-
-    script = "".join(open(out.name).readlines())
+    print(out.name)
+    script = "".join(open(out.name).readlines())   
+    # script = "".join(out.name.readlines())
     if not (saveTo is None):
         # out.write("viewport 1200,1200\n")
         out.write("ray 800,800\n")
@@ -504,7 +508,7 @@ def new_coloring(
         return "".join(open(out.name).readlines())
 
     # out.write("alter all, vdw={0} \n".format(sphereRadius))
-
+    print(out.name)
     script = "".join(open(out.name).readlines())
     if not (saveTo is None):
         # out.write("viewport 1200,1200\n")
