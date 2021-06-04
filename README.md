@@ -2,6 +2,17 @@
 
 [![DOI](https://zenodo.org/badge/178608195.svg)](https://zenodo.org/badge/latestdoi/178608195)
 
+## Install instructions
+polychrom runs off the openmm system for molecular dynamics simulation. Official installation instructions for openmm are here: 
+http://docs.openmm.org/latest/userguide/application.html#installing-openmm
+If you have Anaconda or one of its derivatives like Miniconda already installed, and your GPU drivers are also installed (or you intend to use CPU), installation should be a simple: 
+`conda install -c conda-forge openmm`
+
+Once you openmm, there are a few other python dependencies you may need. Most of these are listed in the 'requirements.txt'. Python will also tell you if any packages are missing and you can simply pip install them then. 
+
+If you do plan to use a CUDA GPU, you will need to make sure your openmm install specifies the matching cudatoolkit.
+An NVIDIA "Titan X Pascal" or "Titan V" are currently the benchmark graphics cards.  
+
 ## Mirny lab polymer simulation library
 
 It keeps improving, but at this point it is as production ready as openmm-polymer ever was. 
