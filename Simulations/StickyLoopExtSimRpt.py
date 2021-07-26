@@ -55,6 +55,7 @@ density = parValues[11] #  0.2  # density of the PBC box
    
 #  ==========Extrusion sim parameters====================
 # there is probably a more elegant way to read in text values than ast.literal_eval, but this works.  
+GPU_ID = str(parValues[14])
 N1 = parValues[0] # Number of monomers in the polymer
 M = parValues[1]  # concatinate replicates of polymer end-to-end (fewer TAD borders to assign, can be averaged if desired for LE)
 N = N1 * M # number of monomers in the full simulation 
@@ -89,7 +90,7 @@ num_chains = M  # simulation uses some equivalent chains  (5 in a real sim)
 MDstepsPerCohesinStep = 800
 smcBondWiggleDist = 0.2
 smcBondDist = 0.5
-saveEveryBlocks = 10   # save every 10 blocks (saving every block is now too much almost)
+saveEveryBlocks = 100   # save every 10 blocks (saving every block is now too much almost)
 restartSimulationEveryBlocks = 100
 
 # check that these loaded alright
@@ -214,7 +215,7 @@ for iteration in range(simInitsTotal):
                    collision_rate=0.01, 
                    integrator ="variableLangevin", 
                    platform="cuda",
-                   GPU = "0", 
+                   GPU = GPU_ID, 
                    PBCbox=(PBC_width, PBC_width, PBC_width),
                    reporters=[reporter],
                    precision="mixed")  # platform="CPU", 
