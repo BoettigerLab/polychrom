@@ -39,7 +39,7 @@ import time
 # ==== Load parameters
 saveFolder = sys.argv[1]
 LEFseparation = np.array(ast.literal_eval(sys.argv[2]))  # 50 or 1e9
-trunc = None; # sys.argv[3]  # None = never, 1.5 = frequent, 5 = rare. 
+trunc = 1.5; # sys.argv[3]  # None = never, 1.5 = frequent, 5 = rare. 
 
 print('save folder')
 print(saveFolder)
@@ -74,12 +74,6 @@ LEFNum = max(0,math.floor(N // LEFseparation )-1)
 #    [should probably rewrite this]
 #   select M random points on the edge of sphere
 r = 1.05*(3 * N/ (4 * np.pi * density)) ** (1 / 3.0)
-theta =np.random.rand(num_chains,1)*np.pi
-psi = np.random.rand(num_chains,1)*2*np.pi
-x= r*np.cos(psi)*np.sin(theta)
-y= r*np.sin(psi)*np.sin(theta)
-z= r*np.cos(theta)
-end_tethers = np.concatenate((x,y,z),axis=1).tolist() 
 
 
 # less common parameters
@@ -87,7 +81,7 @@ attraction_radius = 1.5
 MDstepsPerCohesinStep = 800
 smcBondWiggleDist = 0.2
 smcBondDist = 0.5
-saveEveryBlocks = 100   # save every 10 blocks (saving every block is now too much almost)
+saveEveryBlocks = 10   # save every 10 blocks (saving every block is now too much almost)
 restartSimulationEveryBlocks = 100
 
 # check that these loaded alright
@@ -231,8 +225,7 @@ for iteration in range(simInitsTotal):
         )
     )
     a.add_force(polychrom.forces.spherical_confinement(a,density=density))
-    a.add_force(polychrom.forces.tether_particles(a,[0,N-1],positions=end_tethers,k=30))  # tether ends of polymer)
-    
+     
     # ------------ initializing milker; adding bonds ---------
     # copied from addBond
     kbond = a.kbondScalingFactor / (smcBondWiggleDist ** 2)

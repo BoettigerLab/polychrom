@@ -37,38 +37,56 @@ from polychrom import forcekits
 import time
 
 # ==== Load parameters
-saveFolder = sys.argv[1]
-LEFseparation = np.array(ast.literal_eval(sys.argv[2]))  # 50 or 1e9
-trunc = None; # sys.argv[3]  # None = never, 1.5 = frequent, 5 = rare. 
+parsFile = sys.argv[1]
+print(parsFile)
+# parsFile = r'T:\2020-11-29_PolychromSims\Test\simPars.txt'
 
-print('save folder')
-print(saveFolder)
+t = pd.read_table(parsFile,delimiter=';',squeeze=True)
+parValues = t.values[0]
+
+print('looping through all entries')
+for idx in range(len(t.columns)):
+    v = t.values[0][idx]
+    n = t.columns[idx]
+    print(n)
+    print(v)
 
 # general parameters 
-trajectoryLength = 10000 # 10000 # time duration of simulation (down from 100,000)
-density = .3 # parValues[11] #  0.2  # density of the confining sphere
+trajectoryLength = parValues[10] # 10000 # time duration of simulation (down from 100,000)
+density = parValues[11] #  0.2  # density of the PBC box
   
    
 #  ==========Extrusion sim parameters====================
 # there is probably a more elegant way to read in text values than ast.literal_eval, but this works.  
-GPU_ID = "0" #  str(parValues[14]) # this should be a string
-N1 = 1000 #  parValues[0] # Number of monomers in the polymer
-M = 6  # separate equivelant chromosomes 
+GPU_ID = str(parValues[14]) # this should be a string
+repulsionEnergy= parValues[15] # this is just a number
+N1 = parValues[0] # Number of monomers in the polymer
+M = parValues[1]  # concatinate replicates of polymer end-to-end (fewer TAD borders to assign, can be averaged if desired for LE)
 num_chains = M  # simulation uses some equivalent chains  (5 in a real sim)
 N = N1 * M # number of monomers in the full simulation 
-LIFETIME = 100 # 200 [Imakaev/Mirny use 200 as demo] extruder lifetime
-# LEFseparation = 50 # 500 ave. separation between extruders in monomer units (extruder density) 
-ctcfSites = [100, 200, 300, 500, 600]#  np.array(parValues[4]) # CTCF site locations [80,280,420,550,700,850] # positioned on HoxA
-ctcfDir =   [0, 0, 0, 0, 0] # np.array(parValues[13])
-ctcfCapture = [.9, .9, .9, .9, .9] # = np.array(parValues[5]) # 0.9 80% capture probability per block if capture < than this, capture  
-ctcfRelease = [.003, .003, .003, .003, .003] # np.array(parValues[6]) # 0.003 % release probability per block. if capture < than this, release
+LIFETIME = parValues[2]  # 200 [Imakaev/Mirny use 200 as demo] extruder lifetime
+SEPARATION = parValues[3] # 500 ave. separation between extruders in monomer units (extruder density) 
+ctcfSites = np.array(ast.literal_eval(parValues[4])) # CTCF site locations [80,280,420,550,700,850] # positioned on HoxA
+ctcfDir = np.array(ast.literal_eval(parValues[13]))
+ctcfCapture = np.array(ast.literal_eval(parValues[5])) # 0.9 80% capture probability per block if capture < than this, capture  
+ctcfRelease = np.array(ast.literal_eval(parValues[6])) # 0.003 % release probability per block. if capture < than this, release
+interactionMatrix = np.array(ast.literal_eval(parValues[7]))
+saveFolder = parValues[8]
+oneChainMonomerTypes =  np.array(ast.literal_eval(parValues[9])) # compartment labels
+if len(oneChainMonomerTypes) != N1:
+    oneChainMonomerTypes = np.zeros(N1).astype(int)
 
+
+# need to replicate and renormalize
+loadProb = np.array(ast.literal_eval(parValues[12] ))# discrete probability distribution that cohesin loads at site N
+loadProb = numpy.matlib.repmat(loadProb,1,M)
+loadProb = loadProb/np.sum(loadProb) 
 
 if not os.path.exists(saveFolder):
     os.mkdir(saveFolder)
 
 lefPosFile = saveFolder + "LEFPos.h5"
-LEFNum = max(0,math.floor(N // LEFseparation )-1)
+LEFNum = max(0,math.floor(N // SEPARATION )-1)
 
 # tethering parameters
 #    [should probably rewrite this]
@@ -92,6 +110,10 @@ restartSimulationEveryBlocks = 100
 
 # check that these loaded alright
 print(f'LEF count: {LEFNum}')
+print('interaction matrix:')
+print(interactionMatrix)
+print('monomer types:')
+print(oneChainMonomerTypes)
 print(saveFolder)
 print('Starting simulation')
 
@@ -99,8 +121,7 @@ print('Starting simulation')
 #==================================#
 # Run 
 #=================================#
-# import polychrom.lib.extrusion1Dv2 as ex1D # 1D classes 
-import polychrom.lib.extrusion1D as ex1D # uniform loading 
+import polychrom.lib.extrusion1Dv2 as ex1D # 1D classes 
 ctcfLeftRelease = {}
 ctcfRightRelease = {}
 ctcfLeftCapture = {}
@@ -141,8 +162,7 @@ cohesins = []
 print('starting simulation with N LEFs=')
 print(LEFNum)
 for i in range(LEFNum):
-    ex1D.loadOne(cohesins,occupied, args) # load the cohesins 
-    # ex1D.loadOneFromDist(cohesins,occupied, args,loadProb) # load the cohesins 
+    ex1D.loadOneFromDist(cohesins,occupied, args,loadProb) # load the cohesins 
 
 
 with h5py.File(lefPosFile, mode='w') as myfile:
@@ -156,7 +176,7 @@ with h5py.File(lefPosFile, mode='w') as myfile:
     for st,end in zip(bins[:-1], bins[1:]):
         cur = []
         for i in range(st, end):
-            ex1D.translocate(cohesins, occupied, args)  # actual step of LEF dynamics   # LOADs cohesins
+            ex1D.translocate(cohesins, occupied, args,loadProb)  # actual step of LEF dynamics 
             positions = [(cohesin.left.pos, cohesin.right.pos) for cohesin in cohesins]
             cur.append(positions)  # appending current positions to an array 
         cur = np.array(cur)  # when we finished a block of positions, save it to HDF5 
@@ -178,21 +198,23 @@ block = 0  # starting block
 assert (Nframes % restartSimulationEveryBlocks) == 0 
 assert (restartSimulationEveryBlocks % saveEveryBlocks) == 0
 
-N_chain = N1
-
-
 savesPerSim = restartSimulationEveryBlocks // saveEveryBlocks
 simInitsTotal  = (Nframes) // restartSimulationEveryBlocks
-
+# concatinate monomers if needed
+if len(oneChainMonomerTypes) != N:
+    monomerTypes = np.tile(oneChainMonomerTypes, num_chains)
+else:
+    monomerTypes = oneChainMonomerTypes
+    
+N_chain = len(oneChainMonomerTypes)  
+N = len(monomerTypes)
 print(f'N_chain: {N_chain}')  # ~8000 in a real sim
 print(f'N: {N}')   # ~40000 in a real sim
+N_traj = trajectory_file.attrs["N"]
+print(f'N_traj: {N_traj}')
 assert N == trajectory_file.attrs["N"]
 print(f'Nframes: {Nframes}')
 print(f'simInitsTotal: {simInitsTotal}')
-N_traj = trajectory_file.attrs["N"]
-print(f'N_traj: {N_traj}')
-
-
 #==============================================================#
 #                  RUN 3D simulation                              #
 #==============================================================#
@@ -217,10 +239,15 @@ for iteration in range(simInitsTotal):
         polychrom.forcekits.polymer_chains(
             a,
             chains=chains,
-            nonbonded_force_func=polychrom.forces.grosberg_repulsive_force,
+            nonbonded_force_func=polychrom.forces.heteropolymer_SSW,
             nonbonded_force_kwargs={
-                'trunc': trunc, 
-                },
+                'repulsionEnergy': repulsionEnergy,  # base repulsion energy for all monomers (function default is 3.0)
+                'attractionEnergy': 0,  # base attraction energy for all monomers (function default is 3.0)
+                'attractionRadius': attraction_radius,
+                'interactionMatrix': interactionMatrix,
+                'monomerTypes': monomerTypes,
+                'extraHardParticlesIdxs': []
+            },
             bond_force_kwargs={
                 'bondLength': 1,
                 'bondWiggleDistance': 0.05
@@ -231,7 +258,7 @@ for iteration in range(simInitsTotal):
         )
     )
     a.add_force(polychrom.forces.spherical_confinement(a,density=density))
-    a.add_force(polychrom.forces.tether_particles(a,[0,N-1],positions=end_tethers,k=30))  # tether ends of polymer)
+    # a.add_force(polychrom.forces.tether_particles(a,[0,N-1],positions=end_tethers,k=30))  # tether ends of polymer)
     
     # ------------ initializing milker; adding bonds ---------
     # copied from addBond

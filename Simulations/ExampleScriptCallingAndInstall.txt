@@ -1,0 +1,23 @@
+
+# 1 time only?  (use Anaconda Prompt, not cmd)
+conda create --name openmm_env
+conda activate openmm_env
+conda install -c conda-forge openmm_env
+		(downloads cudatoolkit-11.6.0)
+pip install h5py
+pip install pandas
+pip install joblib
+
+# run simulation
+
+cd C:\Shared\polychrom-shared\Simulations
+python C:\Shared\polychrom-shared\Simulations\AGtopoLoopTetheredEnds.py Z:/Alistair/2022-01-25_AGTopoTest/ 1e9
+
+# run different simulation  (use Anaconda Prompt, not cmd)
+
+conda activate openmm_env
+cd C:\Shared\polychrom-shared\Simulations
+python C:\Shared\polychrom-shared\Simulations\AGtopoLoopFreeEnds.py Z:/Alistair/2022-01-25_AGTopoLETest/ 50
+
+cd C:\Shared\polychrom-shared\Simulations
+python C:\Shared\polychrom-shared\Simulations\AGtopoLoopFreeEnds.py Z:/Alistair/2022-01-25_AGTopoLETest/truc5/ 50
