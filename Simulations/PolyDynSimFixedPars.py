@@ -1,28 +1,10 @@
-'''
-Polymer simulation with dynamic spreading of chromatin state
-A single monomer may adopt a series of states, which helps stabilize memory
 
-Change Log
-migrated from 2022-01-18_PcDynSims3 on 2022-01-20.
-This version uses more readable dictionaries to handle parameters
-'''
-
-# import some libaries
-
-import sys
-import os
+# import some dependencies 
+import pickle, sys, os, h5py, ast, math, copy, time, scipy
 import numpy as np
 import numpy.matlib
-import h5py
-import json
 import pandas as pd
-import math
-import copy
 # # Python's continual incompetence with finding packages
-sys.path.append("C:\Shared\polychrom-shared")  # even the script version needs help 
-# sys.path.append(r'C:\Users\Alistair\Desktop\code\minrylab-polychrom\Simulations') # only needed in jupyter notebook. 
-
-from LEBondUpdater import bondUpdater
 import polychrom
 from polychrom.starting_conformations import grow_cubic
 from polychrom.hdf5_format import HDF5Reporter, list_URIs, load_URI, load_hdf5_file
@@ -30,63 +12,70 @@ from polychrom.simulation import Simulation
 from polychrom import polymerutils
 from polychrom import forces
 from polychrom import forcekits
-import time
-# added
-import scipy
 from scipy import spatial  
 
-#===========================general parameters ========================================
-parsFile = sys.argv[1]
-file = open(parsFile, 'r')
-parsDict =json.load(file) 
-print(parsDict)
+sys.path.append(r'C:\Users\Alistair\Desktop\code\minrylab-polychrom\Simulations')
+from LEBondUpdater import bondUpdater 
 
-saveFolder = parsDict['saveFolder']
-# ---------------- color dynamic pars
-iters =parsDict['iters'] # 2000 # number of iterations to do
-totPc = parsDict['totPc'] # 0.5 #
-onRate = parsDict['onRate'] # 0.4
-offRate = parsDict['offRate'] # 0.3 # .5
-contactRadius = parsDict['contactRadius'] # 2 # 3
-nStates = parsDict['nStates'] # 3
-startLevel = nStates
- 
-#  ------------ Extrusion sim parameters
-# Improved from asstring literal, though for arrays we still need to do some reshaping to make them square again. 
-density = parsDict['density']#   0.2  # density of the PBC box 
-N1 = parsDict['monomers'] # 400 #  Number of monomers in the polymer
-M = parsDict['chains'] # 1  # separate chains in the same volume (will interact in trans with sticky sims)
-N = N1 * M # number of monomers in the full simulation 
-LIFETIME = parsDict['LEFlifetime'] #   50 #  [Imakaev/Mirny use 200 as demo] extruder lifetime
-SEPARATION = parsDict['LEFseparation'] #  1e5 #80  ave. separation between extruders in monomer units (extruder density) 
-ctcfSites = parsDict['ctcfSites'] # np.array([99,100,300,301,400]) #  np.array([0,399,400]) #CTCF site locations  # positioned on HoxA
-ctcfDir = parsDict['ctcfDir'] #  np.zeros(nCTCF) # 0 is bidirectional, 1 is right 2 is left
-ctcfCapture = parsDict['ctcfCapture']  # 0.98*np.ones(nCTCF) #  capture probability per block if capture < than this, capture  
-ctcfRelease = parsDict['ctcfRelease'] # 0.003*np.ones(nCTCF)  # % release probability per block. if capture < than this, release
-# compartment labels
-oneChainMonomerTypes = parsDict['monomerStates'] # np.zeros(N1).astype(int)
-# create interaction matrix
-m =  np.array(parsDict['interactionMatrix'])# (may need to convert to np.array)  np.array([[0, 0, 0], [0, 0.5, 0], [0, 0, 0]])  # .9
-d = int(np.sqrt(m.shape[0]))
-interactionMatrix = np.reshape(m,(d,d))
-
-loadProb = parsDict['loadProb'] 
-
-# unpack short hand parameters
-if oneChainMonomerTypes == 0:
-    oneChainMonomerTypes = np.zeros(N1).astype(int)
+#---------------------------#
+saveRoot = r'T:/2022-05-09_SedonaPcSims/'  # Update ME
+if not os.path.exists(saveRoot):
+    os.mkdir(saveRoot)
+saveFolder = saveRoot +'Attr075NoLE_uniLowGain_lenBal_r3/'  # Update ME
+if not os.path.exists(saveFolder):
+    os.mkdir(saveFolder)  # only creates folders 1 deep, won't create a full path
     
+
+
+# ==================== general parameters  =======================
+
+# ------------color dynamic pars -----------------
+iters = 2000 # number of iterations to do
+totPc = 1/3 # Pc is 1/3 of the domain
+onRate = 0.15 # .4 
+onRateBkd = 0.0015;
+offRate = 0.1 # .15 .5
+contactRadius = 2 #2   3
+nStates = 3
+startLevel = 2
+# ------------------------------------------------
+
+# perturbation  (not used)
+tStart = 0  # time to start pertubation
+x1P = 0      # left coordinate of region to get ectopic Pc (state 3)
+x2P = x1P + 0 # right coordinate of " " " "
+x1R = 0  # left coordinate of region to lose Pc
+x2R = x1R+0 # right coordinate of " " " "
+
+
+#  ==========Extrusion sim parameters====================
+density =  0.2  # density of the PBC box 
+N1 = 600 #  Number of monomers in the polymer
+M = 1  # separate chains in the same volume (will interact in trans with sticky sims)
+N = N1 * M # number of monomers in the full simulation 
+LIFETIME =  50 #  [Imakaev/Mirny use 200 as demo] extruder lifetime
+SEPARATION = 1e5 #80  ave. separation between extruders in monomer units (extruder density) 
+ctcfSites =  np.array([99,100,300,301,400]) #  np.array([0,399,400]) #CTCF site locations  # positioned on HoxA
+nCTCF = np.shape(ctcfSites)[0]
+ctcfDir = np.zeros(nCTCF) # 0 is bidirectional, 1 is right 2 is left
+ctcfCapture = 0.98*np.ones(nCTCF) #  capture probability per block if capture < than this, capture  
+ctcfRelease =0.003*np.ones(nCTCF)  # % release probability per block. if capture < than this, release
+# compartment labels
+oneChainMonomerTypes = np.zeros(N1).astype(int)
+oneChainMonomerTypes[200:400] = 1 # mod self interaction
+# create interaction matrix
+interactionMatrix = np.array([[0, 0, 0], [0, 0.75, 0], [0, 0, 0]])  #=== KEY parameter  ===#
+# ==== coil globule transition occurs around .7 for monomers of this length
+
 # load prob
-if loadProb == 0:
-    loadProb = np.ones([1,N1])  # uniform loading probability
-    loadProb = numpy.matlib.repmat(loadProb,1,M) # need to replicate and renormalize
-    loadProb = loadProb/np.sum(loadProb) 
-
-
+loadProb = np.ones([1,N1])  # uniform loading probability
+loadProb = numpy.matlib.repmat(loadProb,1,M) # need to replicate and renormalize
+loadProb = loadProb/np.sum(loadProb) 
 lefPosFile = saveFolder + "LEFPos.h5"
 LEFNum =  math.floor(N // SEPARATION )  # make 0 for no LEFs
+
 monomers = N1
-nCTCF = np.shape(ctcfSites)[0]
+
 
 # less common parameters
 attraction_radius = 1.5  #  try making this larger
@@ -94,6 +83,7 @@ num_chains = M  # simulation uses some equivalent chains  (5 in a real sim)
 MDstepsPerCohesinStep = 800
 smcBondWiggleDist = 0.2
 smcBondDist = 0.5
+angle_force = 1.5 # most sims ran with 1.5.  0 might have been better
 
 # save pars
 saveEveryBlocks = 10   # save every 10 blocks 
@@ -110,10 +100,9 @@ print(oneChainMonomerTypes)
 print(saveFolder)
 
 
-
-#======================================================================#
-#                     Run and load 1D simulation                       #
-#======================================================================#
+#==================================#
+# Run and load 1D simulation
+#=================================#
 import polychrom.lib.extrusion1Dv2 as ex1D # 1D classes 
 ctcfLeftRelease = {}
 ctcfRightRelease = {}
@@ -159,7 +148,6 @@ for i in range(LEFNum):
 
 
 with h5py.File(lefPosFile, mode='w') as myfile:
-    
     dset = myfile.create_dataset("positions", 
                                  shape=(trajectoryLength, LEFNum, 2), 
                                  dtype=np.int32, 
@@ -210,13 +198,16 @@ print(f'Nframes: {Nframes}')
 print(f'simInitsTotal: {simInitsTotal}')
 
 
+# ========== save parameters as pickle file in folder with the data ============
+parList = [density,N1,M,LIFETIME,SEPARATION,iters,totPc,onRate,offRate,contactRadius,attraction_radius,num_chains,MDstepsPerCohesinStep,smcBondWiggleDist,smcBondDist,saveEveryBlocks,restartSimulationEveryBlocks,ctcfSites,ctcfDir,ctcfCapture,ctcfRelease,oneChainMonomerTypes,interactionMatrix,loadProb,nStates,startLevel]
+parFile = saveFolder +'pars.pkl'
+# Saving the objects:
+with open(parFile, 'wb') as f:  # Python 3: open(..., 'wb')
+    pickle.dump(parList, f)
 
 #==============================================================#
 #                  RUN 3D simulation                              #
 #==============================================================#
-import shutil
-
-
 # Initial simulation using fixed input states
 t=0
 LEFsubset = LEFpositions[t*restartSimulationEveryBlocks:(t+1)*restartSimulationEveryBlocks,:,:] # a subset of the total LEF simulation time
@@ -225,8 +216,6 @@ data = grow_cubic(N,int((N/(density*1.2))**0.333))  # starting conformation
 PBC_width = (N/density)**0.333
 chains = [(N_chain*(k),N_chain*(k+1),0) for k in range(num_chains)]  # subchains in rpt
 newFolder = saveFolder+'t'+str(0)+'/'
-if os.path.exists(newFolder):
-    shutil.rmtree(newFolder)
 os.mkdir(newFolder)
 reporter = HDF5Reporter(folder=newFolder, max_data_length=100)
 a = Simulation(N=N, 
@@ -256,7 +245,7 @@ a.add_force(
             'bondWiggleDistance': 0.05
         },
         angle_force_kwargs={
-            'k': 1.5
+            'k': angle_force
         }
     )
 )
@@ -304,26 +293,33 @@ for t in range(iters):
     for p in range(M):
         polyDat = data[p*monomers:(p+1)*monomers,:]  # ['pos'][p*monomers:(p+1)*monomers,:]
         newColors = copy.copy(colorStates[t,p*monomers:(p+1)*monomers]) # note this is not a copy, just a reference. updating newColors immideately updates colorStates
-        fracBound = sum(newColors)/monomers/nStates
-        fracFree = max(0,totPc-fracBound)
+        # moved frac bound down
         isLoss = np.random.rand(monomers) < offRate
         newColors[isLoss] = newColors[isLoss]-1 # was 0  # note, this immideately updates colorStates
         newColors[newColors<0] = 0
+        fracBound = sum(newColors)/monomers/nStates
+        fracFree = max(0,totPc-fracBound)
         ordr = np.random.permutation(monomers)
         dMap = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(polyDat))
         isOn = newColors # newColors == 1
         for o in ordr:
             isClose = dMap[o,:] < contactRadius
-            tries = sum(isClose * isOn)
+            tries = sum(isClose * isOn)  
             updateProb = onRate*tries*fracFree
-            updateColor = np.random.rand() < updateProb
+            updateColor = np.random.rand() < updateProb  or  (np.random.rand(1) < onRateBkd*fracFree)  # ADDED FOR background integration
             if updateColor and newColors[o]<nStates:
                 newColors[o] = newColors[o] + 1  # note, this immideately updates colorStates
                 # colorStates[t+1,p*monomers+o] = 1     
+                
+            if t==tStart  and  o>x1P and o<x2P:  # perturbation at t=200
+                newColors[o] = 3
+            if t==tStart and  o>x1R and o<x2R:  # 
+                newColors[o] = 0
+                
         colorStates[t+1,p*monomers:(p+1)*monomers] = newColors
-    # ============ run new polymer sim  ==========================
+    # ============ run new polymer sim  ==========================    
     
-    isPc =  colorStates[t+1,:]>1
+    isPc =  colorStates[t+1,:]>0
     isPc = isPc.astype(int)
     LEFsubset = LEFpositions[t*restartSimulationEveryBlocks:(t+1)*restartSimulationEveryBlocks,:,:]
     milker = bondUpdater(LEFsubset)
@@ -354,7 +350,7 @@ for t in range(iters):
                 'bondWiggleDistance': 0.05
             },
             angle_force_kwargs={
-                'k': 1.5
+                'k': angle_force
             }
         )
     )
@@ -371,7 +367,7 @@ for t in range(iters):
 
     # Start simulation without local energy minimization 
     a._apply_forces()
-
+        
     for i in range(restartSimulationEveryBlocks):        
         if i % saveEveryBlocks == (saveEveryBlocks - 1):  
             a.do_block(steps=steps)
@@ -387,13 +383,8 @@ for t in range(iters):
     
     saveColors = saveFolder + 'colorStates.csv'
     pd.DataFrame(colorStates).to_csv(saveColors)
-    
-#===================================== Document results by saving parameters in a pkl
-# Python saves is parameters:
-import pickle
 
-parList = [density,N1,M,LIFETIME,SEPARATION,iters,totPc,onRate,offRate,contactRadius,attraction_radius,num_chains,MDstepsPerCohesinStep,smcBondWiggleDist,smcBondDist,saveEveryBlocks,restartSimulationEveryBlocks,ctcfSites,ctcfDir,ctcfCapture,ctcfRelease,oneChainMonomerTypes,interactionMatrix,loadProb,nStates,startLevel]
-parFile = saveFolder +'pars.pkl'
-# Saving the objects:
-with open(parFile, 'wb') as f:  # Python 3: open(..., 'wb')
-    pickle.dump(parList, f)
+saveColors = saveFolder + 'colorStates.csv'
+pd.DataFrame(colorStates).to_csv(saveColors)
+
+
