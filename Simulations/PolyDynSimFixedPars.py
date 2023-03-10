@@ -5,6 +5,7 @@ import numpy as np
 import numpy.matlib
 import pandas as pd
 # # Python's continual incompetence with finding packages
+sys.path.append("C:\Shared\polychrom-shared")
 import polychrom
 from polychrom.starting_conformations import grow_cubic
 from polychrom.hdf5_format import HDF5Reporter, list_URIs, load_URI, load_hdf5_file
@@ -18,10 +19,10 @@ sys.path.append(r'C:\Users\Alistair\Desktop\code\minrylab-polychrom\Simulations'
 from LEBondUpdater import bondUpdater 
 
 #---------------------------#
-saveRoot = r'T:/2022-05-09_SedonaPcSims/'  # Update ME
+saveRoot = r'Z:\Alistair\PolymerSims\2022-05-31_NewPcSims/'  # Update ME
 if not os.path.exists(saveRoot):
     os.mkdir(saveRoot)
-saveFolder = saveRoot +'Attr075NoLE_uniLowGain_lenBal_r3/'  # Update ME
+saveFolder = saveRoot +'Attr030NoLE_uniLowGain_lenBal_r4/'  # Update ME
 if not os.path.exists(saveFolder):
     os.mkdir(saveFolder)  # only creates folders 1 deep, won't create a full path
     
@@ -64,7 +65,7 @@ ctcfRelease =0.003*np.ones(nCTCF)  # % release probability per block. if capture
 oneChainMonomerTypes = np.zeros(N1).astype(int)
 oneChainMonomerTypes[200:400] = 1 # mod self interaction
 # create interaction matrix
-interactionMatrix = np.array([[0, 0, 0], [0, 0.75, 0], [0, 0, 0]])  #=== KEY parameter  ===#
+interactionMatrix = np.array([[0, 0, 0], [0, 0.30, 0], [0, 0, 0]])  #=== KEY parameter  ===#
 # ==== coil globule transition occurs around .7 for monomers of this length
 
 # load prob
