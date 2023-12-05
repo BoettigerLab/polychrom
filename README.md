@@ -1,8 +1,10 @@
-# polychrom
+# BoettigerLab-polychrom
+
+[![DOI](https://zenodo.org/badge/373875569.svg)](https://zenodo.org/doi/10.5281/zenodo.7698986)
 
 This code is used for polymer simulations of chromatin loop extrusion and heterotypic sticky interactions.  
 
-This repository is the Boettiger lab fork of the "polychrom" repository developed by the Open Chromatin Collective (Open2C), github.com/open2c.  Most of the framework was written by Max Imakaev and colleagues, and it builds off work completed and published in the Mirny lab using its predecessor, openmm-polymer.  The project is largely a set of python wrappers for chromatin polymer simulations, built on top of the [openmm system](http://docs.openmm.org/latest/userguide/application.html#installing-openmm) for molecular dynamics simulations.  Additional documentation can be found at the [github.com/open2c/polychrom](github.com/open2c/polychrom)  Our version of the repository is built on top of the following polychrom release:
+This repository is the Boettiger lab fork of the "polychrom" repository developed by the Open Chromatin Collective (Open2C), github.com/open2c.  Most of the framework was written by Max Imakaev and colleagues, and it builds off work completed and published in the Mirny lab using its predecessor, openmm-polymer.  The project is largely a set of python wrappers for chromatin polymer simulations, built on top of the [openmm system](http://docs.openmm.org/latest/userguide/application.html#installing-openmm) for molecular dynamics simulations.  Additional documentation can be found at the [github.com/open2c/polychrom](github.com/open2c/polychrom)  Our version of the repository is built as a fork of the following polychrom release:
 
 [![DOI](https://zenodo.org/badge/178608195.svg)](https://zenodo.org/badge/latestdoi/178608195)
 
